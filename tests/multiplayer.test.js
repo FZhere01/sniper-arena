@@ -12,11 +12,13 @@ test('online rooms support two real websocket clients with opposite teams',async
  try{
    let ready=false;for(let i=0;i<30;i++){try{const res=await fetch(`http://127.0.0.1:${port}/health`);if(res.ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}
    assert.ok(ready,'server should be healthy');
-   a=await opened(`ws://127.0.0.1:${port}`);const m1=onceMessage(a,m=>m.type==='welcome');a.send(JSON.stringify({type:'join',name:'PlayerOne'}));const first=await m1;
-   b=await opened(`ws://127.0.0.1:${port}`);const m2=onceMessage(b,m=>m.type==='welcome');b.send(JSON.stringify({type:'join',name:'PlayerTwo',code:first.code}));const second=await m2;
+   a=await opened(`ws://127.0.0.1:${port}`);const m1=onceMessage(a,m=>m.type==='welcome');a.send(JSON.stringify({type:'join',name:'PlayerOne',skin:'hazmat'}));const first=await m1;
+   b=await opened(`ws://127.0.0.1:${port}`);const m2=onceMessage(b,m=>m.type==='welcome');b.send(JSON.stringify({type:'join',name:'PlayerTwo',skin:'not-a-skin',code:first.code}));const second=await m2;
    assert.equal(first.code,second.code);assert.notEqual(first.team,second.team);
    const snapshot=await onceMessage(a,m=>m.type==='state'&&m.players.length===2);
    assert.equal(snapshot.players.length,2);assert.equal(snapshot.players[0].level,1);
+   assert.equal(snapshot.players.find(p=>p.id===first.id).skin,'hazmat');
+   assert.equal(snapshot.players.find(p=>p.id===second.id).skin,'shadow');
    // Push a real player toward cover, then toward the arena boundary.
    const solids=first.obstacles;
    for(let i=0;i<80;i++){

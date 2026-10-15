@@ -22,6 +22,7 @@ const obstacles = [
   { x: 19, z: 0, w: 3, d: 9, h: 3.1 }
 ];
 export { obstacles };
+const skinIds=new Set(['shadow','hazmat','red-jester','grin','clown','hockey','jester','paper','ape']);
 const rooms = new Map();
 const roomChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const sanitize = text => String(text || '').replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 16) || 'SNIPER';
@@ -42,7 +43,7 @@ function spawn(room, team) {
 function generateCode() { let code; do { code = Array.from({length:5},()=>roomChars[Math.floor(Math.random()*roomChars.length)]).join(''); } while(rooms.has(code)); return code; }
 function safeSend(ws, data) { if (ws.readyState === 1) ws.send(JSON.stringify(data)); }
 function broadcast(room, data) { for (const p of room.players.values()) safeSend(p.ws,data); }
-function publicPlayer(p, now) {return {id:p.id,name:p.name,team:p.team,x:p.x,z:p.z,yaw:p.yaw,pitch:p.pitch,alive:p.alive,kills:p.kills,deaths:p.deaths,level:p.level,respawn:!p.alive?Math.max(0,p.respawnAt-now):0};}
+function publicPlayer(p, now) {return {id:p.id,name:p.name,skin:p.skin,team:p.team,x:p.x,z:p.z,yaw:p.yaw,pitch:p.pitch,alive:p.alive,kills:p.kills,deaths:p.deaths,level:p.level,respawn:!p.alive?Math.max(0,p.respawnAt-now):0};}
 function snapshot(room) {const now=Date.now(); return {type:'state',time:now,players:[...room.players.values()].map(p=>publicPlayer(p,now))};}
 function teamCount(room, team) { return [...room.players.values()].filter(p=>p.team===team).length; }
 // Horizontal ray vs axis-aligned obstacle. Treat obstacles as infinite-height for anti-wallhack line of sight.
@@ -138,20 +139,20 @@ wss.on('connection',ws=>{
     if(!m || typeof m.type!=='string')return;
     if(m.type==='join' && !player){
       const requested=String(m.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
-      if(requested){room=rooms.get(requested);if(!room){safeSend(ws,{type:'error',message:'الغرفة غير موجودة'});return;}}
+      if(requested){room=rooms.get(requested);if(!room){safeSend(ws,{type:'error',message:'Room not found. Check the invitation code.'});return;}}
       else {const code=generateCode();room={code,players:new Map()};rooms.set(code,room);}
-      if(room.players.size>=MAX_PLAYERS_ROOM){safeSend(ws,{type:'error',message:'الغرفة ممتلئة'});return;}
+      if(room.players.size>=MAX_PLAYERS_ROOM){safeSend(ws,{type:'error',message:'Room is full.'});return;}
       const team=teamCount(room,0)<=teamCount(room,1)?0:1;
       const loc=spawn(room,team);
-      player={id:nextId++,name:sanitize(m.name),team,...loc,yaw:team===0?Math.PI/2:-Math.PI/2,pitch:0,alive:true,kills:0,deaths:0,level:1,respawnAt:0,protectedUntil:Date.now()+1500,lastShot:0,lastMove:Date.now(),ws};
+      player={id:nextId++,name:sanitize(m.name),skin:skinIds.has(m.skin)?m.skin:'shadow',team,...loc,yaw:team===0?Math.PI/2:-Math.PI/2,pitch:0,alive:true,kills:0,deaths:0,level:1,respawnAt:0,protectedUntil:Date.now()+1500,lastShot:0,lastMove:Date.now(),ws};
       room.players.set(player.id,player);
       safeSend(ws,{type:'welcome',id:player.id,code:room.code,team,obstacles,arena:ARENA});
-      broadcast(room,{type:'notice',message:`${player.name} دخل الساحة`});
+      broadcast(room,{type:'notice',message:`${player.name} joined the arena`});
     } else if(player && m.type==='move')handleMove(player,m);
     else if(player && m.type==='shoot'){if(Number.isFinite(m.yaw))player.yaw=clamp(m.yaw,-1e6,1e6);if(Number.isFinite(m.pitch))player.pitch=clamp(m.pitch,-1.15,1.15);handleShoot(room,player);}
     else if(player && m.type==='ping')safeSend(ws,{type:'pong',time:m.time});
   });
-  ws.on('close',()=>{if(!player||!room)return;room.players.delete(player.id);broadcast(room,{type:'notice',message:`${player.name} غادر الساحة`});if(!room.players.size)rooms.delete(room.code);});
+  ws.on('close',()=>{if(!player||!room)return;room.players.delete(player.id);broadcast(room,{type:'notice',message:`${player.name} left the arena`});if(!room.players.size)rooms.delete(room.code);});
 });
 setInterval(()=>{
   const now=Date.now();
