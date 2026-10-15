@@ -1,3 +1,4 @@
+import { MODE, playerScale, playerRadius, targetInSight } from './public/rules.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,21 +32,21 @@ const distance2 = (a, b) => (a.x - b.x)**2 + (a.z-b.z)**2;
 function intersectsBox(x, z, radius = .52) {
   return obstacles.some(o => Math.abs(x-o.x) < o.w/2+radius && Math.abs(z-o.z) < o.d/2+radius);
 }
-function validPosition(x,z) { return Math.abs(x) < ARENA/2 - .6 && Math.abs(z) < ARENA/2 - .6 && !intersectsBox(x,z); }
-function spawn(room, team) {
+function validPosition(x,z,radius=.52) { return Math.abs(x) < ARENA/2 - .45-radius && Math.abs(z) < ARENA/2 - .45-radius && !intersectsBox(x,z,radius); }
+function spawn(room, kills=0) {
   for(let i=0;i<25;i++) {
-    const x = (team === 0 ? -17 : 17) + (Math.random()-.5)*8;
+    const x = (Math.random()-.5)*42;
     const z = (Math.random()-.5)*32;
-    if (validPosition(x,z) && [...room.players.values()].every(p => !p.alive || distance2({x,z},p)>6)) return {x,z};
+    if (validPosition(x,z,playerRadius(kills)) && [...room.players.values()].every(p => !p.alive || distance2({x,z},p)>6)) return {x,z};
   }
-  return {x: team === 0 ? -17 : 17, z: team === 0 ? -17 : 17};
+  for(const x of [-20,20])for(const z of [-20,20])if(validPosition(x,z,playerRadius(kills)))return {x,z};
+  return {x:-20,z:-20};
 }
 function generateCode() { let code; do { code = Array.from({length:5},()=>roomChars[Math.floor(Math.random()*roomChars.length)]).join(''); } while(rooms.has(code)); return code; }
 function safeSend(ws, data) { if (ws.readyState === 1) ws.send(JSON.stringify(data)); }
 function broadcast(room, data) { for (const p of room.players.values()) safeSend(p.ws,data); }
-function publicPlayer(p, now) {return {id:p.id,name:p.name,skin:p.skin,team:p.team,x:p.x,z:p.z,yaw:p.yaw,pitch:p.pitch,alive:p.alive,kills:p.kills,deaths:p.deaths,level:p.level,respawn:!p.alive?Math.max(0,p.respawnAt-now):0};}
-function snapshot(room) {const now=Date.now(); return {type:'state',time:now,players:[...room.players.values()].map(p=>publicPlayer(p,now))};}
-function teamCount(room, team) { return [...room.players.values()].filter(p=>p.team===team).length; }
+function publicPlayer(p, now) {return {id:p.id,name:p.name,skin:p.skin,scale:playerScale(p.kills),x:p.x,z:p.z,yaw:p.yaw,pitch:p.pitch,alive:p.alive,kills:p.kills,deaths:p.deaths,level:p.level,respawn:!p.alive?Math.max(0,p.respawnAt-now):0};}
+function snapshot(room) {const now=Date.now(); return {type:'state',mode:MODE,time:now,players:[...room.players.values()].map(p=>publicPlayer(p,now))};}
 // Horizontal ray vs axis-aligned obstacle. Treat obstacles as infinite-height for anti-wallhack line of sight.
 function wallDistance(ox,oz,dx,dz,maxDist) {
   let best=maxDist;
@@ -67,13 +68,10 @@ function handleShoot(room, shooter) {
   let winner=null, hitT=120;
   const wallT=wallDistance(shooter.x,shooter.z,dx,dz,120);
   for(const target of room.players.values()) {
-    if(target.id===shooter.id || !target.alive || target.team===shooter.team || now<target.protectedUntil)continue;
-    const rx=target.x-shooter.x,rz=target.z-shooter.z;
-    const t=rx*dx+rz*dz;
-    const side=Math.abs(rx*dz-rz*dx);
-    if(t>.3 && t<hitT && t<wallT && side<.6 && 1.65+Math.tan(shooter.pitch)*t>0 && 1.65+Math.tan(shooter.pitch)*t<2.3){winner=target;hitT=t;}
+    const t=targetInSight(shooter,target,Math.min(wallT,hitT),now);
+    if(t!==null){winner=target;hitT=t;}
   }
-  broadcast(room,{type:'shot',id:shooter.id,x:shooter.x,z:shooter.z,yaw:shooter.yaw,hitId:winner?.id??null});
+  broadcast(room,{type:'shot',id:shooter.id,x:shooter.x,z:shooter.z,yaw:shooter.yaw,pitch:shooter.pitch,kills:shooter.kills,hitId:winner?.id??null});
   if(!winner)return;
   winner.alive=false; winner.deaths++; winner.respawnAt=now+RESPAWN_MS;
   shooter.kills++; shooter.level++;
@@ -86,8 +84,8 @@ function handleMove(p, m) {
   const mx=clamp(Number(m.mx)||0,-1,1),mz=clamp(Number(m.mz)||0,-1,1);
   const n=Math.max(1,Math.hypot(mx,mz)),speed=m.sprint?SPRINT_SPEED:MOVE_SPEED;
   const x=p.x+mx/n*speed*elapsed,z=p.z+mz/n*speed*elapsed;
-  if(validPosition(x,p.z)) p.x=x;
-  if(validPosition(p.x,z)) p.z=z;
+  if(validPosition(x,p.z,playerRadius(p.kills))) p.x=x;
+  if(validPosition(p.x,z,playerRadius(p.kills))) p.z=z;
   if(Number.isFinite(m.yaw))p.yaw=clamp(m.yaw,-1e6,1e6);
   if(Number.isFinite(m.pitch))p.pitch=clamp(m.pitch,-1.15,1.15);
 }
@@ -140,13 +138,12 @@ wss.on('connection',ws=>{
     if(m.type==='join' && !player){
       const requested=String(m.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
       if(requested){room=rooms.get(requested);if(!room){safeSend(ws,{type:'error',message:'Room not found. Check the invitation code.'});return;}}
-      else {const code=generateCode();room={code,players:new Map()};rooms.set(code,room);}
+      else {room=[...rooms.values()].find(r=>r.players.size<MAX_PLAYERS_ROOM);if(!room){const code=generateCode();room={code,players:new Map()};rooms.set(code,room);}}
       if(room.players.size>=MAX_PLAYERS_ROOM){safeSend(ws,{type:'error',message:'Room is full.'});return;}
-      const team=teamCount(room,0)<=teamCount(room,1)?0:1;
-      const loc=spawn(room,team);
-      player={id:nextId++,name:sanitize(m.name),skin:skinIds.has(m.skin)?m.skin:'shadow',team,...loc,yaw:team===0?Math.PI/2:-Math.PI/2,pitch:0,alive:true,kills:0,deaths:0,level:1,respawnAt:0,protectedUntil:Date.now()+1500,lastShot:0,lastMove:Date.now(),ws};
+      const loc=spawn(room);
+      player={id:nextId++,name:sanitize(m.name),skin:skinIds.has(m.skin)?m.skin:'shadow',...loc,yaw:Math.random()*Math.PI*2,pitch:0,alive:true,kills:0,deaths:0,level:1,respawnAt:0,protectedUntil:Date.now()+1500,lastShot:0,lastMove:Date.now(),ws};
       room.players.set(player.id,player);
-      safeSend(ws,{type:'welcome',id:player.id,code:room.code,team,obstacles,arena:ARENA});
+      safeSend(ws,{type:'welcome',id:player.id,code:room.code,mode:MODE,x:player.x,z:player.z,yaw:player.yaw,obstacles,arena:ARENA});
       broadcast(room,{type:'notice',message:`${player.name} joined the arena`});
     } else if(player && m.type==='move')handleMove(player,m);
     else if(player && m.type==='shoot'){if(Number.isFinite(m.yaw))player.yaw=clamp(m.yaw,-1e6,1e6);if(Number.isFinite(m.pitch))player.pitch=clamp(m.pitch,-1.15,1.15);handleShoot(room,player);}
@@ -157,7 +154,7 @@ wss.on('connection',ws=>{
 setInterval(()=>{
   const now=Date.now();
   for(const room of rooms.values()){
-    for(const p of room.players.values())if(!p.alive && now>=p.respawnAt){Object.assign(p,spawn(room,p.team));p.alive=true;p.protectedUntil=now+1500;p.lastMove=now;safeSend(p.ws,{type:'respawn',x:p.x,z:p.z});}
+    for(const p of room.players.values())if(!p.alive && now>=p.respawnAt){Object.assign(p,spawn(room,p.kills));p.alive=true;p.protectedUntil=now+1500;p.lastMove=now;safeSend(p.ws,{type:'respawn',x:p.x,z:p.z});}
     broadcast(room,snapshot(room));
   }
 },TICK_MS);

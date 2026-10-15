@@ -1,6 +1,6 @@
 # SNIPER ARENA — 3D browser multiplayer prototype
 
-Two-team sniper arena, real online rooms (up to 12 players), one-shot eliminations, +1 level per kill, 3-second respawn, sprint, scoped aiming, mobile touch joystick/buttons. A minimal playable prototype, not a production anti-cheat implementation.
+Free-for-all sniper arena, real online rooms (up to 12 players), one-shot eliminations, +1 level per kill, 3-second respawn, sprint, scoped aiming, mobile touch joystick/buttons. A minimal playable prototype, not a production anti-cheat implementation.
 
 ## Run locally
 
@@ -23,11 +23,13 @@ Visit http://localhost:3000. Open a second browser tab/device on the same networ
 
 ## Controls
 
-Desktop: WASD move, Shift sprint, mouse to aim, click shoot, right mouse button scope. Mobile: left virtual joystick, drag right half to look around, FIRE, ZOOM, جري.
+Desktop: WASD move, Shift sprint, mouse aim, click fire, right mouse button scope, Escape match menu. Mobile: left stick move, swipe right to aim, FIRE, SCOPE, and SPRINT ON/OFF toggle. The top-right menu shows the roster and allows leaving the match.
 
 ## Gameplay details
 
-- Kills count against opposing team only; each kill gives +1 level; teams are auto-balanced at join.
+- Free for all: every other player is an opponent. Quick Play joins an open match automatically; room codes still work for invitations.
+- Each kill gives +1 level and multiplies character size by 0.94, with a minimum of 50%. Model scale, hitbox, collision radius, and eye height agree; progression survives respawn.
+- Nine selectable animated 3D operators; selections are broadcast to other players.
 - Sniper bullets are instantaneous ray tests and respect block cover. One hit is an elimination. 1.25s bolt-action cooldown.
 - Player returns 3 seconds after death, with a short 1.5s spawn shield.
 - No account system; room exists while at least one player remains.
