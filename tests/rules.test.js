@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {playerScale,playerRadius,eyeHeight,targetInSight} from '../public/rules.js';
 test('kill progression shrinks visible body, collision and camera together',()=>{
  assert.equal(playerScale(0),1);
- assert.ok(playerScale(1)<playerScale(0));assert.ok(playerScale(2)<playerScale(1));
+ assert.equal(playerScale(1),.8);assert.ok(Math.abs(playerScale(2)-.64)<1e-12);assert.ok(Math.abs(playerScale(3)-.512)<1e-12);assert.equal(playerScale(4),.5);
  assert.equal(playerRadius(5)/.52,playerScale(5));assert.equal(eyeHeight(5)/1.65,playerScale(5));
  assert.equal(playerScale(1000),.5);
 });

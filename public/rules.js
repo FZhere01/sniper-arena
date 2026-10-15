@@ -1,6 +1,6 @@
 // Shared authoritative dimensions: visual size, eye height and collision agree.
 export const MODE='FREE FOR ALL';
-export const playerScale=kills=>Math.max(.5,Math.pow(.94,Math.max(0,Number(kills)||0)));
+export const playerScale=kills=>Math.max(.5,Math.pow(.8,Math.max(0,Number(kills)||0)));
 export const playerRadius=kills=>.52*playerScale(kills);
 export const eyeHeight=kills=>1.65*playerScale(kills);
 export function targetInSight(shooter,target,wallDistance,now=Date.now()){
