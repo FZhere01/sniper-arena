@@ -17,5 +17,18 @@ test('online rooms support two real websocket clients with opposite teams',async
    assert.equal(first.code,second.code);assert.notEqual(first.team,second.team);
    const snapshot=await onceMessage(a,m=>m.type==='state'&&m.players.length===2);
    assert.equal(snapshot.players.length,2);assert.equal(snapshot.players[0].level,1);
+   // Push a real player toward cover, then toward the arena boundary.
+   const solids=first.obstacles;
+   for(let i=0;i<80;i++){
+     const statePromise=onceMessage(a,m=>m.type==='state');
+     const player=snapshot.players.find(p=>p.id===first.id);
+     const dx=i<40?-Math.sign(player.x):1,dz=i<40?-Math.sign(player.z):1;
+     a.send(JSON.stringify({type:'move',mx:dx,mz:dz,sprint:true,yaw:0,pitch:0}));
+     const state=await statePromise;
+     const current=state.players.find(p=>p.id===first.id);
+     assert.ok(Math.abs(current.x)<22.4&&Math.abs(current.z)<22.4,'player stays inside perimeter');
+     assert.ok(!solids.some(o=>Math.abs(current.x-o.x)<o.w/2+.519&&Math.abs(current.z-o.z)<o.d/2+.519),'player never enters solid cover');
+     snapshot.players=state.players;
+   }
  }finally{a?.close();b?.close();proc.kill();}
 });

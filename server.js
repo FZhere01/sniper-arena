@@ -70,7 +70,7 @@ function handleShoot(room, shooter) {
     const rx=target.x-shooter.x,rz=target.z-shooter.z;
     const t=rx*dx+rz*dz;
     const side=Math.abs(rx*dz-rz*dx);
-    if(t>.3 && t<hitT && t<wallT && side<.9 && Math.abs(shooter.pitch)<.62){winner=target;hitT=t;}
+    if(t>.3 && t<hitT && t<wallT && side<.6 && 1.65+Math.tan(shooter.pitch)*t>0 && 1.65+Math.tan(shooter.pitch)*t<2.3){winner=target;hitT=t;}
   }
   broadcast(room,{type:'shot',id:shooter.id,x:shooter.x,z:shooter.z,yaw:shooter.yaw,hitId:winner?.id??null});
   if(!winner)return;
@@ -83,7 +83,7 @@ function handleMove(p, m) {
   const now=Date.now(); const elapsed=clamp((now-p.lastMove)/1000,0,.11);
   p.lastMove=now;
   const mx=clamp(Number(m.mx)||0,-1,1),mz=clamp(Number(m.mz)||0,-1,1);
-  const n=Math.hypot(mx,mz)||1,speed=m.sprint?SPRINT_SPEED:MOVE_SPEED;
+  const n=Math.max(1,Math.hypot(mx,mz)),speed=m.sprint?SPRINT_SPEED:MOVE_SPEED;
   const x=p.x+mx/n*speed*elapsed,z=p.z+mz/n*speed*elapsed;
   if(validPosition(x,p.z)) p.x=x;
   if(validPosition(p.x,z)) p.z=z;
@@ -148,7 +148,7 @@ wss.on('connection',ws=>{
       safeSend(ws,{type:'welcome',id:player.id,code:room.code,team,obstacles,arena:ARENA});
       broadcast(room,{type:'notice',message:`${player.name} دخل الساحة`});
     } else if(player && m.type==='move')handleMove(player,m);
-    else if(player && m.type==='shoot')handleShoot(room,player);
+    else if(player && m.type==='shoot'){if(Number.isFinite(m.yaw))player.yaw=clamp(m.yaw,-1e6,1e6);if(Number.isFinite(m.pitch))player.pitch=clamp(m.pitch,-1.15,1.15);handleShoot(room,player);}
     else if(player && m.type==='ping')safeSend(ws,{type:'pong',time:m.time});
   });
   ws.on('close',()=>{if(!player||!room)return;room.players.delete(player.id);broadcast(room,{type:'notice',message:`${player.name} غادر الساحة`});if(!room.players.size)rooms.delete(room.code);});
