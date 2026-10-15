@@ -19,6 +19,10 @@ test('explicit room creation and joining share operators and enforce solid cover
    assert.equal(snapshot.players.length,2);assert.equal(snapshot.players[0].level,1);
    assert.equal(snapshot.players.find(p=>p.id===first.id).skin,'hazmat');
    assert.equal(snapshot.players.find(p=>p.id===second.id).skin,'shadow');
+   const jumpEvent=onceMessage(a,m=>m.type==='jump'&&m.id===first.id);a.send(JSON.stringify({type:'jump'}));const started=await jumpEvent;
+   a.send(JSON.stringify({type:'jump'}));const airborne=await onceMessage(a,m=>m.type==='state'&&m.players.find(p=>p.id===first.id)?.y>0);
+   assert.equal(airborne.players.find(p=>p.id===first.id).jumpAt,started.jumpAt,'jump cannot restart while airborne');
+   await new Promise(r=>setTimeout(r,850));const grounded=await onceMessage(a,m=>m.type==='state');assert.equal(grounded.players.find(p=>p.id===first.id).y,0,'player lands on server');
    // Push a real player toward cover, then toward the arena boundary.
    const solids=first.obstacles;
    for(let i=0;i<80;i++){

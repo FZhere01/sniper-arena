@@ -23,7 +23,7 @@ Visit http://localhost:3000. Open a second browser tab/device on the same networ
 
 ## Controls
 
-Desktop: WASD move, Shift sprint, mouse aim, click fire, right mouse button scope, Escape match menu. Mobile: left stick move, swipe right to aim, FIRE, SCOPE, and SPRINT ON/OFF toggle. The top-right menu shows the roster and allows leaving the match.
+Desktop: WASD move, Shift sprint, Space jump, mouse aim, click fire, right mouse button scope, Escape match menu. Mobile: left stick move, swipe right to aim, FIRE, SCOPE, SPRINT ON/OFF toggle, and JUMP. The top-right menu shows the roster and allows leaving the match.
 
 ## Gameplay details
 

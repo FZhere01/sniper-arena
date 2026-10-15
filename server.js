@@ -1,4 +1,4 @@
-import { MODE, playerScale, playerRadius, targetInSight } from './public/rules.js';
+import { MODE, JUMP_MS, jumpOffset, playerScale, playerRadius, targetInSight } from './public/rules.js';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,7 +45,7 @@ function spawn(room, kills=0) {
 function generateCode() { let code; do { code = Array.from({length:5},()=>roomChars[Math.floor(Math.random()*roomChars.length)]).join(''); } while(rooms.has(code)); return code; }
 function safeSend(ws, data) { if (ws.readyState === 1) ws.send(JSON.stringify(data)); }
 function broadcast(room, data) { for (const p of room.players.values()) safeSend(p.ws,data); }
-function publicPlayer(p, now) {return {id:p.id,name:p.name,skin:p.skin,scale:playerScale(p.kills),x:p.x,z:p.z,yaw:p.yaw,pitch:p.pitch,alive:p.alive,kills:p.kills,deaths:p.deaths,level:p.level,respawn:!p.alive?Math.max(0,p.respawnAt-now):0};}
+function publicPlayer(p, now) {return {id:p.id,name:p.name,skin:p.skin,scale:playerScale(p.kills),x:p.x,z:p.z,jumpAt:p.jumpAt,y:jumpOffset(p,now),yaw:p.yaw,pitch:p.pitch,alive:p.alive,kills:p.kills,deaths:p.deaths,level:p.level,respawn:!p.alive?Math.max(0,p.respawnAt-now):0};}
 function snapshot(room) {const now=Date.now(); return {type:'state',mode:MODE,time:now,players:[...room.players.values()].map(p=>publicPlayer(p,now))};}
 // Horizontal ray vs axis-aligned obstacle. Treat obstacles as infinite-height for anti-wallhack line of sight.
 function wallDistance(ox,oz,dx,dz,maxDist) {
@@ -71,9 +71,9 @@ function handleShoot(room, shooter) {
     const t=targetInSight(shooter,target,Math.min(wallT,hitT),now);
     if(t!==null){winner=target;hitT=t;}
   }
-  broadcast(room,{type:'shot',id:shooter.id,x:shooter.x,z:shooter.z,yaw:shooter.yaw,pitch:shooter.pitch,kills:shooter.kills,hitId:winner?.id??null});
+  broadcast(room,{type:'shot',id:shooter.id,x:shooter.x,z:shooter.z,yaw:shooter.yaw,pitch:shooter.pitch,y:jumpOffset(shooter,now),kills:shooter.kills,hitId:winner?.id??null});
   if(!winner)return;
-  winner.alive=false; winner.deaths++; winner.respawnAt=now+RESPAWN_MS;
+  winner.alive=false; winner.jumpAt=0; winner.deaths++; winner.respawnAt=now+RESPAWN_MS;
   shooter.kills++; shooter.level++;
   broadcast(room,{type:'kill',killer:shooter.id,victim:winner.id,killerName:shooter.name,victimName:winner.name,killerLevel:shooter.level,respawnMs:RESPAWN_MS});
 }
@@ -140,11 +140,12 @@ wss.on('connection',ws=>{
       else {const requested=String(m.code||'').trim().toUpperCase();if(!/^[A-Z0-9]{5}$/.test(requested)){safeSend(ws,{type:'error',message:'Enter a valid 5-character room code.'});return;}room=rooms.get(requested);if(!room){safeSend(ws,{type:'error',message:'Room not found. Check your friend’s code.'});return;}}
       if(room.players.size>=MAX_PLAYERS_ROOM){safeSend(ws,{type:'error',message:'Room is full.'});return;}
       const loc=spawn(room);
-      player={id:nextId++,name:sanitize(m.name),skin:skinIds.has(m.skin)?m.skin:'shadow',...loc,yaw:Math.random()*Math.PI*2,pitch:0,alive:true,kills:0,deaths:0,level:1,respawnAt:0,protectedUntil:Date.now()+1500,lastShot:0,lastMove:Date.now(),ws};
+      player={id:nextId++,name:sanitize(m.name),skin:skinIds.has(m.skin)?m.skin:'shadow',...loc,yaw:Math.random()*Math.PI*2,pitch:0,jumpAt:0,alive:true,kills:0,deaths:0,level:1,respawnAt:0,protectedUntil:Date.now()+1500,lastShot:0,lastMove:Date.now(),ws};
       room.players.set(player.id,player);
       safeSend(ws,{type:'welcome',id:player.id,code:room.code,mode:MODE,x:player.x,z:player.z,yaw:player.yaw,obstacles,arena:ARENA});
       broadcast(room,{type:'notice',message:`${player.name} joined the arena`});
     } else if(player && m.type==='move')handleMove(player,m);
+    else if(player && m.type==='jump'){const now=Date.now();if(player.alive&&now-player.jumpAt>=JUMP_MS){player.jumpAt=now;broadcast(room,{type:'jump',id:player.id,jumpAt:now});}}
     else if(player && m.type==='shoot'){if(Number.isFinite(m.yaw))player.yaw=clamp(m.yaw,-1e6,1e6);if(Number.isFinite(m.pitch))player.pitch=clamp(m.pitch,-1.15,1.15);handleShoot(room,player);}
     else if(player && m.type==='ping')safeSend(ws,{type:'pong',time:m.time});
   });
@@ -153,7 +154,7 @@ wss.on('connection',ws=>{
 setInterval(()=>{
   const now=Date.now();
   for(const room of rooms.values()){
-    for(const p of room.players.values())if(!p.alive && now>=p.respawnAt){Object.assign(p,spawn(room,p.kills));p.alive=true;p.protectedUntil=now+1500;p.lastMove=now;safeSend(p.ws,{type:'respawn',x:p.x,z:p.z});}
+    for(const p of room.players.values())if(!p.alive && now>=p.respawnAt){Object.assign(p,spawn(room,p.kills));p.alive=true;p.jumpAt=0;p.protectedUntil=now+1500;p.lastMove=now;safeSend(p.ws,{type:'respawn',x:p.x,z:p.z});}
     broadcast(room,snapshot(room));
   }
 },TICK_MS);
