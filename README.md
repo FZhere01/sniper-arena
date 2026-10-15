@@ -10,7 +10,7 @@ Requires Node.js 20+. **No npm install required.**
 node server.js
 ```
 
-Visit http://localhost:3000. Open a second browser tab/device on the same network to test multiplayer. Create a room, then give the friend your invitation URL or the room code. The **Three.js client library is loaded from jsDelivr** and requires internet when loading the game.
+Visit http://localhost:3000. Open a second browser tab/device on the same network to test multiplayer. Choose CREATE ROOM, then give your friend the invitation URL or generated code. They choose JOIN ROOM and enter that code. The **Three.js client library is loaded from jsDelivr** and requires internet when loading the game.
 
 ## Publish a playable link (Render or Railway)
 
@@ -27,7 +27,7 @@ Desktop: WASD move, Shift sprint, mouse aim, click fire, right mouse button scop
 
 ## Gameplay details
 
-- Free for all: every other player is an opponent. Quick Play joins an open match automatically; room codes still work for invitations.
+- Free for all: every other player is an opponent. CREATE ROOM always creates a new match with a random 5-character code. JOIN ROOM requires an existing friend’s code; invitation links preselect Join.
 - Each kill gives +1 level and multiplies character size by 0.94, with a minimum of 50%. Model scale, hitbox, collision radius, and eye height agree; progression survives respawn.
 - Nine selectable animated 3D operators; selections are broadcast to other players.
 - Sniper bullets are instantaneous ray tests and respect block cover. One hit is an elimination. 1.25s bolt-action cooldown.

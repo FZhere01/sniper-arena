@@ -135,10 +135,9 @@ wss.on('connection',ws=>{
   ws.on('message',buffer=>{
     let m;try{m=JSON.parse(String(buffer));}catch{return;}
     if(!m || typeof m.type!=='string')return;
-    if(m.type==='join' && !player){
-      const requested=String(m.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
-      if(requested){room=rooms.get(requested);if(!room){safeSend(ws,{type:'error',message:'Room not found. Check the invitation code.'});return;}}
-      else {room=[...rooms.values()].find(r=>r.players.size<MAX_PLAYERS_ROOM);if(!room){const code=generateCode();room={code,players:new Map()};rooms.set(code,room);}}
+    if((m.type==='join'||m.type==='create') && !player){
+      if(m.type==='create'){const code=generateCode();room={code,players:new Map()};rooms.set(code,room);}
+      else {const requested=String(m.code||'').trim().toUpperCase();if(!/^[A-Z0-9]{5}$/.test(requested)){safeSend(ws,{type:'error',message:'Enter a valid 5-character room code.'});return;}room=rooms.get(requested);if(!room){safeSend(ws,{type:'error',message:'Room not found. Check your friend’s code.'});return;}}
       if(room.players.size>=MAX_PLAYERS_ROOM){safeSend(ws,{type:'error',message:'Room is full.'});return;}
       const loc=spawn(room);
       player={id:nextId++,name:sanitize(m.name),skin:skinIds.has(m.skin)?m.skin:'shadow',...loc,yaw:Math.random()*Math.PI*2,pitch:0,alive:true,kills:0,deaths:0,level:1,respawnAt:0,protectedUntil:Date.now()+1500,lastShot:0,lastMove:Date.now(),ws};
