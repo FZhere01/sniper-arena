@@ -39,3 +39,5 @@ Desktop: WASD move, Shift sprint, Space jump, mouse aim, click fire, right mouse
 Add server-side lag compensation, proper pitch-aware 3D raycasting, better rate limiting, match duration/score target, sound, real character models/animations, mobile performance options, username moderation, persistence, matchmaking, and stronger anti-cheat validation. Server accepts client movement vectors but clamps move speed and collision. Experimental prototype, not hardened for large public lobbies.
 
 Fullscreen is available in the lobby and match menu on supporting browsers.
+
+Matches last 15 minutes by default. The creator can choose any whole duration from 1 to 60 minutes. A shared server deadline drives the countdown for all players, including late joiners. At zero, play stops and the final leaderboard appears (kills, then fewer deaths). Return to the lobby and create a new room to play again.
